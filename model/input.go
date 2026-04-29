@@ -22,10 +22,10 @@ type CircuitBreakerConfig struct {
 }
 
 type ExponentialBackoffConfig struct {
-	Initial     float64
-	Max         float64
-	Multiplier  float64
-	MaxAttempts int
+	Initial     float64 `json:"initial"`
+	Max         float64 `json:"max"`
+	Multiplier  float64 `json:"multiplier"`
+	MaxAttempts int     `json:"max_attempts"`
 }
 
 // TODO: Implement more Resilience patterns
