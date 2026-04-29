@@ -34,7 +34,7 @@ type ResiliencePatterns struct {
 }
 
 type CalledServiceResilience struct {
-	ExponentialBackoff *ExponentialBackoffConfig `json:"exponentail_backoff,omitempty"`
+	ExponentialBackoff *ExponentialBackoffConfig `json:"exponential_backoff,omitempty"`
 }
 
 type CalledService struct {
