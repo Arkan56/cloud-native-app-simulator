@@ -16,14 +16,36 @@ limitations under the License.
 
 package model
 
+type CircuitBreakerConfig struct {
+	Timeout    int `json:"timeout"`
+	RetryTimer int `json:"retry_timer"`
+}
+
+type ExponentialBackoffConfig struct {
+	Initial     float64
+	Max         float64
+	Multiplier  float64
+	MaxAttempts int
+}
+
+// TODO: Implement more Resilience patterns
+type ResiliencePatterns struct {
+	CircuitBreaker *CircuitBreakerConfig `json:"circuit_breaker,omitempty"`
+}
+
+type CalledServiceResilience struct {
+	ExponentialBackoff *ExponentialBackoffConfig `json:"exponentail_backoff,omitempty"`
+}
+
 type CalledService struct {
-	Service              string `json:"service"`
-	Port                 int    `json:"port"`
-	Endpoint             string `json:"endpoint"`
-	Protocol             string `json:"protocol"`
-	TrafficForwardRatio  int    `json:"traffic_forward_ratio"`
-	RequestPayloadSize   int    `json:"request_payload_size"`
-	ActiveCircuitBreaker bool   `json:"active_circuit_breaker"`
+	Service              string                   `json:"service"`
+	Port                 int                      `json:"port"`
+	Endpoint             string                   `json:"endpoint"`
+	Protocol             string                   `json:"protocol"`
+	TrafficForwardRatio  int                      `json:"traffic_forward_ratio"`
+	RequestPayloadSize   int                      `json:"request_payload_size"`
+	ActiveCircuitBreaker bool                     `json:"active_circuit_breaker"`
+	ResiliencePatterns   *CalledServiceResilience `json:"resilience_patterns,omitempty"`
 }
 
 type CpuComplexity struct {
@@ -35,16 +57,6 @@ type NetworkComplexity struct {
 	ForwardRequests     string          `json:"forward_requests"`
 	ResponsePayloadSize int             `json:"response_payload_size"`
 	CalledServices      []CalledService `json:"called_services"`
-}
-
-type CircuitBreakerConfig struct {
-	Timeout    int `json:"timeout"`
-	RetryTimer int `json:"retry_timer"`
-}
-
-// TODO: Implement more Resilience patterns
-type ResiliencePatterns struct {
-	CircuitBreaker *CircuitBreakerConfig `json:"circuit_breaker,omitempty"`
 }
 
 type Endpoint struct {

@@ -18,6 +18,8 @@ package client
 
 import (
 	"application-emulator/src/resilience/circuit_breaker"
+	"application-emulator/src/resilience/exp_backoff"
+	model "application-model"
 	"application-model/generated"
 	"bytes"
 	"encoding/json"
@@ -32,7 +34,7 @@ import (
 const useProtoJSON = true
 
 // Sends a HTTP POST request to the specified endpoint
-func POST(service, endpoint string, port int, payload string, headers http.Header, sourceEndpoint string) (int, *generated.Response, error) {
+func POST(service, endpoint string, port int, payload string, headers http.Header, sourceEndpoint string, cfg model.CalledServiceResilience) (int, *generated.Response, error) {
 	var url string
 	// Omit the port if zero
 	if port == 0 {
@@ -71,10 +73,14 @@ func POST(service, endpoint string, port int, payload string, headers http.Heade
 	var response *http.Response
 	var err error
 
-	if circuitBreaker == nil {
-		response, err = http.DefaultClient.Do(request)
-	} else {
+	if circuitBreaker != nil {
 		response, err = circuitBreaker.ProxyHTTP(request)
+	}
+	if cfg.ExponentialBackoff != nil {
+		retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
+		response, err = retry.ProxyHTTP(request)
+	} else {
+		response, err = http.DefaultClient.Do(request)
 	}
 
 	log.Printf("[CLIENT HTTP] Request returned from %s/%s", service, endpoint)

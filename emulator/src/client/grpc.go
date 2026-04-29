@@ -19,6 +19,8 @@ package client
 import (
 	"application-emulator/src/generated/client"
 	"application-emulator/src/resilience/circuit_breaker"
+	"application-emulator/src/resilience/exp_backoff"
+	model "application-model"
 	"application-model/generated"
 	"context"
 	"fmt"
@@ -29,7 +31,7 @@ import (
 )
 
 // Sends a gRPC request to the specified endpoint
-func GRPC(service, endpoint string, port int, payload, sourceEndpoint string) (*generated.Response, error) {
+func GRPC(service, endpoint string, port int, payload, sourceEndpoint string, cfg model.CalledServiceResilience) (*generated.Response, error) {
 	var url string
 	// Omit the port if zero
 	if port == 0 {
@@ -57,13 +59,17 @@ func GRPC(service, endpoint string, port int, payload, sourceEndpoint string) (*
 	}
 	callOptions := []grpc.CallOption{}
 
-	if circuitBreaker == nil {
+	if circuitBreaker != nil {
+		response, err = circuitBreaker.ProxyGRPC(conn, service, endpoint, request, callOptions...)
+	}
+	if cfg.ExponentialBackoff != nil {
+		retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
+		response, err = retry.ProxyGRPC(conn, service, endpoint, request, callOptions...)
+	} else {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
 		response, err = client.CallGeneratedEndpoint(ctx, conn, service, endpoint, request, callOptions...)
-	} else {
-		response, err = circuitBreaker.ProxyGRPC(conn, service, endpoint, request, callOptions...)
 	}
 
 	if err != nil {
