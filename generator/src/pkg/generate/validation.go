@@ -150,19 +150,21 @@ func ValidateProtocols(service *model.Service) error {
 						calledService.Endpoint, endpoint.Name, calledService.Protocol)
 				}
 				// Exponential backoff validations
-				eb := calledService.ResiliencePatterns.ExponentialBackoff
-				if eb != nil {
-					if eb.Initial <= 0 || eb.Max <= 0 || eb.Multiplier <= 0 || eb.MaxAttempts <= 0 {
-						return fmt.Errorf("Exponential backoff must have its parameters values > 0")
-					}
-					if calledService.ResiliencePatterns.ExponentialBackoff.Initial >= calledService.ResiliencePatterns.ExponentialBackoff.Max {
-						return fmt.Errorf("Initial time must be less than max time in exponential backoff")
-					}
-					if calledService.ResiliencePatterns.ExponentialBackoff.Multiplier <= 1 {
-						return fmt.Errorf("multiplier must be > 1 for exponential backoff")
+				if calledService.ResiliencePatterns != nil &&
+					calledService.ResiliencePatterns.ExponentialBackoff != nil {
+					eb := calledService.ResiliencePatterns.ExponentialBackoff
+					if eb != nil {
+						if eb.Initial <= 0 || eb.Max <= 0 || eb.Multiplier <= 0 || eb.MaxAttempts <= 0 {
+							return fmt.Errorf("Exponential backoff must have its parameters values > 0")
+						}
+						if calledService.ResiliencePatterns.ExponentialBackoff.Initial >= calledService.ResiliencePatterns.ExponentialBackoff.Max {
+							return fmt.Errorf("Initial time must be less than max time in exponential backoff")
+						}
+						if calledService.ResiliencePatterns.ExponentialBackoff.Multiplier <= 1 {
+							return fmt.Errorf("multiplier must be > 1 for exponential backoff")
+						}
 					}
 				}
-
 			}
 		}
 	}
