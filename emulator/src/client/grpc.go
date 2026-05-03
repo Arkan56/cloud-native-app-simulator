@@ -31,7 +31,7 @@ import (
 )
 
 // Sends a gRPC request to the specified endpoint
-func GRPC(service, endpoint string, port int, payload, sourceEndpoint string, cfg model.CalledServiceResilience) (*generated.Response, error) {
+func GRPC(service, endpoint string, port int, payload, sourceEndpoint string, cfg *model.CalledServiceResilience) (*generated.Response, error) {
 	var url string
 	// Omit the port if zero
 	if port == 0 {
