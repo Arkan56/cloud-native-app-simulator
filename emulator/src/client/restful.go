@@ -34,7 +34,7 @@ import (
 const useProtoJSON = true
 
 // Sends a HTTP POST request to the specified endpoint
-func POST(service, endpoint string, port int, payload string, headers http.Header, sourceEndpoint string, cfg model.CalledServiceResilience) (int, *generated.Response, error) {
+func POST(service, endpoint string, port int, payload string, headers http.Header, sourceEndpoint string, cfg *model.CalledServiceResilience) (int, *generated.Response, error) {
 	var url string
 	// Omit the port if zero
 	if port == 0 {
