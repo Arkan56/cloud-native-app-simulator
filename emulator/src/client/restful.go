@@ -76,9 +76,11 @@ func POST(service, endpoint string, port int, payload string, headers http.Heade
 	if circuitBreaker != nil {
 		response, err = circuitBreaker.ProxyHTTP(request)
 	}
-	if cfg.ExponentialBackoff != nil {
-		retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
-		response, err = retry.ProxyHTTP(request)
+	if cfg != nil {
+		if cfg.ExponentialBackoff != nil {
+			retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
+			response, err = retry.ProxyHTTP(request)
+		}
 	} else {
 		response, err = http.DefaultClient.Do(request)
 	}

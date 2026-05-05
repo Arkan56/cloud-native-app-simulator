@@ -62,9 +62,11 @@ func GRPC(service, endpoint string, port int, payload, sourceEndpoint string, cf
 	if circuitBreaker != nil {
 		response, err = circuitBreaker.ProxyGRPC(conn, service, endpoint, request, callOptions...)
 	}
-	if cfg.ExponentialBackoff != nil {
-		retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
-		response, err = retry.ProxyGRPC(conn, service, endpoint, request, callOptions...)
+	if cfg != nil {
+		if cfg.ExponentialBackoff != nil {
+			retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
+			response, err = retry.ProxyGRPC(conn, service, endpoint, request, callOptions...)
+		}
 	} else {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
