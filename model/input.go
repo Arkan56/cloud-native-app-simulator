@@ -28,6 +28,10 @@ type ExponentialBackoffConfig struct {
 	MaxAttempts int     `json:"max_attempts"`
 }
 
+type TimeoutConfig struct {
+	Duration float64 `json:"duration"`
+}
+
 // TODO: Implement more Resilience patterns
 type ResiliencePatterns struct {
 	CircuitBreaker *CircuitBreakerConfig `json:"circuit_breaker,omitempty"`
@@ -35,6 +39,7 @@ type ResiliencePatterns struct {
 
 type CalledServiceResilience struct {
 	ExponentialBackoff *ExponentialBackoffConfig `json:"exponential_backoff,omitempty"`
+	Timeout            *TimeoutConfig            `json:"timeout,omitempty"`
 }
 
 type CalledService struct {

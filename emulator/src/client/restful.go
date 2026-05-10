@@ -19,6 +19,7 @@ package client
 import (
 	"application-emulator/src/resilience/circuit_breaker"
 	"application-emulator/src/resilience/exp_backoff"
+	"application-emulator/src/resilience/timeout"
 	model "application-model"
 	"application-model/generated"
 	"bytes"
@@ -80,6 +81,10 @@ func POST(service, endpoint string, port int, payload string, headers http.Heade
 		if cfg.ExponentialBackoff != nil {
 			retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
 			response, err = retry.ProxyHTTP(request)
+		}
+		if cfg.Timeout != nil {
+			to := timeout.NewTimeout(*cfg.Timeout)
+			response, err = to.ProxyHTTP(request)
 		}
 	} else {
 		response, err = http.DefaultClient.Do(request)

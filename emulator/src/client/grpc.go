@@ -20,6 +20,7 @@ import (
 	"application-emulator/src/generated/client"
 	"application-emulator/src/resilience/circuit_breaker"
 	"application-emulator/src/resilience/exp_backoff"
+	"application-emulator/src/resilience/timeout"
 	model "application-model"
 	"application-model/generated"
 	"context"
@@ -66,6 +67,10 @@ func GRPC(service, endpoint string, port int, payload, sourceEndpoint string, cf
 		if cfg.ExponentialBackoff != nil {
 			retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
 			response, err = retry.ProxyGRPC(conn, service, endpoint, request, callOptions...)
+		}
+		if cfg.Timeout != nil {
+			to := timeout.NewTimeout(*cfg.Timeout)
+			response, err = to.ProxyGRPC(conn, service, endpoint, request, callOptions...)
 		}
 	} else {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)

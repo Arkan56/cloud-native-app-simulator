@@ -164,6 +164,12 @@ func ValidateProtocols(service *model.Service) error {
 							return fmt.Errorf("multiplier must be > 1 for exponential backoff")
 						}
 					}
+					to := calledService.ResiliencePatterns.Timeout
+					if to != nil {
+						if to.Duration <= 0 {
+							return fmt.Errorf("Timeout duration must be > 0")
+						}
+					}
 				}
 			}
 		}
