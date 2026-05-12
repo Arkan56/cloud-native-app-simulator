@@ -20,6 +20,7 @@ import (
 	"application-emulator/src/generated/client"
 	"application-emulator/src/resilience/circuit_breaker"
 	"application-emulator/src/resilience/exp_backoff"
+	"application-emulator/src/resilience/fallback"
 	"application-emulator/src/resilience/timeout"
 	model "application-model"
 	"application-model/generated"
@@ -60,6 +61,8 @@ func GRPC(service, endpoint string, port int, payload, sourceEndpoint string, cf
 	}
 	callOptions := []grpc.CallOption{}
 
+	var fb *fallback.FallbackImpl
+
 	if circuitBreaker != nil {
 		response, err = circuitBreaker.ProxyGRPC(conn, service, endpoint, request, callOptions...)
 	}
@@ -72,6 +75,9 @@ func GRPC(service, endpoint string, port int, payload, sourceEndpoint string, cf
 			to := timeout.NewTimeout(*cfg.Timeout)
 			response, err = to.ProxyGRPC(conn, service, endpoint, request, callOptions...)
 		}
+		if cfg.Fallback != nil {
+			fb = fallback.NewFallback(*cfg.Fallback)
+		}
 	} else {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
@@ -80,6 +86,12 @@ func GRPC(service, endpoint string, port int, payload, sourceEndpoint string, cf
 	}
 
 	if err != nil {
+		if fb != nil {
+			fbResp, ferr := fb.ExecuteGRPC(payload, endpoint)
+			if ferr == nil {
+				return fbResp, nil
+			}
+		}
 		return nil, err
 	}
 

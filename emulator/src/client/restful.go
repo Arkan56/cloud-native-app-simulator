@@ -19,6 +19,7 @@ package client
 import (
 	"application-emulator/src/resilience/circuit_breaker"
 	"application-emulator/src/resilience/exp_backoff"
+	"application-emulator/src/resilience/fallback"
 	"application-emulator/src/resilience/timeout"
 	model "application-model"
 	"application-model/generated"
@@ -73,6 +74,7 @@ func POST(service, endpoint string, port int, payload string, headers http.Heade
 
 	var response *http.Response
 	var err error
+	var fb *fallback.FallbackImpl
 
 	if circuitBreaker != nil {
 		response, err = circuitBreaker.ProxyHTTP(request)
@@ -86,12 +88,39 @@ func POST(service, endpoint string, port int, payload string, headers http.Heade
 			to := timeout.NewTimeout(*cfg.Timeout)
 			response, err = to.ProxyHTTP(request)
 		}
+		if cfg.Fallback != nil {
+			fb = fallback.NewFallback(*cfg.Fallback)
+		}
 	} else {
 		response, err = http.DefaultClient.Do(request)
 	}
 
 	log.Printf("[CLIENT HTTP] Request returned from %s/%s", service, endpoint)
-	if err != nil {
+	if err != nil || (response != nil && response.StatusCode >= 500) {
+		if fb != nil {
+			resp, ferr := fb.ExecuteHTTP(postData, headers, endpoint)
+			if ferr == nil {
+				endpointResponse := &generated.Response{}
+				// Read all bytes
+				defer resp.Body.Close()
+				data, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return 0, nil, err
+				}
+				if useProtoJSON {
+					err = protojson.Unmarshal(data, endpointResponse)
+					if err != nil {
+						return 0, nil, err
+					}
+				} else {
+					err = json.Unmarshal(data, endpointResponse)
+					if err != nil {
+						return 0, nil, err
+					}
+				}
+				return resp.StatusCode, endpointResponse, nil
+			}
+		}
 		return 0, nil, err
 	}
 

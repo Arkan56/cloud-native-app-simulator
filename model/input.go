@@ -32,6 +32,19 @@ type TimeoutConfig struct {
 	Duration float64 `json:"duration"`
 }
 
+type FallbackConfig struct {
+	Type string `json:"type"`
+
+	// static
+	ResponseCode    int    `json:"response_code,omitempty"`
+	ResponseMessage string `json:"response_payload,omitempty"`
+
+	// service
+	FallbackService  string `json:"service,omitempty"`
+	FallbackEndpoint string `json:"endpoint,omitempty"`
+	FallbackPort     int    `json:"port,omitempty"`
+}
+
 // TODO: Implement more Resilience patterns
 type ResiliencePatterns struct {
 	CircuitBreaker *CircuitBreakerConfig `json:"circuit_breaker,omitempty"`
@@ -40,6 +53,7 @@ type ResiliencePatterns struct {
 type CalledServiceResilience struct {
 	ExponentialBackoff *ExponentialBackoffConfig `json:"exponential_backoff,omitempty"`
 	Timeout            *TimeoutConfig            `json:"timeout,omitempty"`
+	Fallback           *FallbackConfig           `json:"fallback,omitempty"`
 }
 
 type CalledService struct {

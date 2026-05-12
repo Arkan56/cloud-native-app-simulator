@@ -149,25 +149,72 @@ func ValidateProtocols(service *model.Service) error {
 					return fmt.Errorf("call to endpoint '%s' from endpoint '%s' has invalid protocol '%s'",
 						calledService.Endpoint, endpoint.Name, calledService.Protocol)
 				}
-				// Exponential backoff validations
-				if calledService.ResiliencePatterns != nil &&
-					calledService.ResiliencePatterns.ExponentialBackoff != nil {
+				if calledService.ResiliencePatterns != nil {
+					// Exponential backoff validations
 					eb := calledService.ResiliencePatterns.ExponentialBackoff
 					if eb != nil {
-						if eb.Initial <= 0 || eb.Max <= 0 || eb.Multiplier <= 0 || eb.MaxAttempts <= 0 {
-							return fmt.Errorf("Exponential backoff must have its parameters values > 0")
+						if eb.Initial <= 0 || eb.Max <= 0 ||
+							eb.Multiplier <= 0 || eb.MaxAttempts <= 0 {
+							return fmt.Errorf(
+								"exponential backoff parameters must be > 0",
+							)
 						}
-						if calledService.ResiliencePatterns.ExponentialBackoff.Initial >= calledService.ResiliencePatterns.ExponentialBackoff.Max {
-							return fmt.Errorf("Initial time must be less than max time in exponential backoff")
+						if eb.Initial >= eb.Max {
+							return fmt.Errorf(
+								"initial time must be less than max time",
+							)
 						}
-						if calledService.ResiliencePatterns.ExponentialBackoff.Multiplier <= 1 {
-							return fmt.Errorf("multiplier must be > 1 for exponential backoff")
+						if eb.Multiplier <= 1 {
+							return fmt.Errorf(
+								"multiplier must be > 1",
+							)
 						}
 					}
+					//Timeout validations
 					to := calledService.ResiliencePatterns.Timeout
 					if to != nil {
 						if to.Duration <= 0 {
-							return fmt.Errorf("Timeout duration must be > 0")
+							return fmt.Errorf(
+								"timeout duration must be > 0",
+							)
+						}
+					}
+					//Fallback validations
+					fb := calledService.ResiliencePatterns.Fallback
+					if fb != nil {
+						validTypes := map[string]bool{
+							"static":  true,
+							"service": true,
+						}
+						if !validTypes[fb.Type] {
+							return fmt.Errorf(
+								"invalid fallback type '%s'",
+								fb.Type,
+							)
+						}
+						switch fb.Type {
+						case "static":
+							if fb.ResponseCode <= 0 {
+								return fmt.Errorf(
+									"static fallback requires response_code > 0",
+								)
+							}
+							if fb.ResponseMessage == "" {
+								return fmt.Errorf(
+									"static fallback requires response_message",
+								)
+							}
+						case "service":
+							if fb.FallbackService == "" {
+								return fmt.Errorf(
+									"service fallback requires service name",
+								)
+							}
+							if fb.FallbackEndpoint == "" {
+								return fmt.Errorf(
+									"service fallback requires endpoint",
+								)
+							}
 						}
 					}
 				}
