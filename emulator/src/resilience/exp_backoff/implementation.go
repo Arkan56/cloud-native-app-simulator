@@ -6,6 +6,8 @@ import (
 	"application-model/generated"
 	"context"
 	"errors"
+	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"time"
@@ -58,6 +60,11 @@ func (b *ExponentialBackoffImpl) Execute(cb RequestCallback) (any, error) {
 		response, err := cb(context.Background())
 
 		if err == nil {
+			log.Printf(
+				"[RETRY] success attempt=%d/%d",
+				attemp+1,
+				b.MaxAttempts,
+			)
 			return response, nil
 		}
 
@@ -65,8 +72,24 @@ func (b *ExponentialBackoffImpl) Execute(cb RequestCallback) (any, error) {
 
 		delay := b.GetDelay(attemp)
 
-		time.Sleep(delay)
+		log.Printf(
+			"[RETRY] failed attempt=%d/%d err=%v next_delay=%v",
+			attemp+1,
+			b.MaxAttempts,
+			err,
+			delay,
+		)
+
+		if attemp < b.MaxAttempts-1 {
+			time.Sleep(delay)
+		}
 	}
+
+	log.Printf(
+		"[RETRY] exhausted attempts=%d last_error=%v",
+		b.MaxAttempts,
+		lastErr,
+	)
 
 	return nil, lastErr
 }
@@ -75,7 +98,18 @@ func (b *ExponentialBackoffImpl) ProxyHTTP(request *http.Request) (*http.Respons
 
 	response, err := b.Execute(func(ctx context.Context) (any, error) {
 		req := request.WithContext(ctx)
-		return http.DefaultClient.Do(req)
+		resp, err := http.DefaultClient.Do(req)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if resp.StatusCode >= 500 {
+			return nil, fmt.Errorf("retryable status: %d", resp.StatusCode)
+		}
+
+		return resp, nil
+
 	})
 
 	if err != nil {

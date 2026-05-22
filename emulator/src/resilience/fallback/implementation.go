@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -37,9 +38,21 @@ func (f *FallbackImpl) ExecuteHTTP(
 	headers http.Header,
 	endpoint string) (*http.Response, error) {
 
+	log.Printf(
+		"[FALLBACK HTTP] executing type=%s endpoint=%s",
+		f.Config.Type,
+		endpoint,
+	)
+
 	switch f.Config.Type {
 
 	case TypeStatic:
+
+		log.Printf(
+			"[FALLBACK HTTP] using static response code=%d message=%s",
+			f.Config.ResponseCode,
+			f.Config.ResponseMessage,
+		)
 
 		fallbackResponse := &generated.Response{
 			Endpoint: endpoint,
@@ -68,6 +81,11 @@ func (f *FallbackImpl) ExecuteHTTP(
 	case TypeService:
 
 		var url string
+
+		log.Printf(
+			"[FALLBACK HTTP] forwarding request to fallback service=%s",
+			url,
+		)
 
 		if f.Config.FallbackPort == 0 {
 			url = fmt.Sprintf(
@@ -101,7 +119,22 @@ func (f *FallbackImpl) ExecuteHTTP(
 			}
 		}
 
-		return http.DefaultClient.Do(request)
+		response, err := http.DefaultClient.Do(request)
+
+		if err != nil {
+			log.Printf(
+				"[FALLBACK HTTP] fallback request failed err=%v",
+				err,
+			)
+			return nil, err
+		}
+
+		log.Printf(
+			"[FALLBACK HTTP] fallback request succeeded status=%d",
+			response.StatusCode,
+		)
+
+		return response, nil
 
 	default:
 
@@ -119,9 +152,20 @@ func (f *FallbackImpl) ExecuteGRPC(
 	callOptions ...grpc.CallOption,
 ) (*generated.Response, error) {
 
+	log.Printf(
+		"[FALLBACK GRPC] executing type=%s endpoint=%s",
+		f.Config.Type,
+		endpoint,
+	)
+
 	switch f.Config.Type {
 
 	case TypeStatic:
+
+		log.Printf(
+			"[FALLBACK GRPC] using static response message=%s",
+			f.Config.ResponseMessage,
+		)
 
 		return &generated.Response{
 			Endpoint: endpoint,
@@ -132,6 +176,11 @@ func (f *FallbackImpl) ExecuteGRPC(
 	case TypeService:
 
 		var url string
+
+		log.Printf(
+			"[FALLBACK GRPC] connecting to fallback service=%s",
+			url,
+		)
 
 		if f.Config.FallbackPort == 0 {
 			url = f.Config.FallbackService
@@ -151,8 +200,16 @@ func (f *FallbackImpl) ExecuteGRPC(
 		)
 
 		if err != nil {
+			log.Printf(
+				"[FALLBACK GRPC] failed to connect err=%v",
+				err,
+			)
 			return nil, err
 		}
+
+		log.Printf(
+			"[FALLBACK GRPC] grpc connection established",
+		)
 
 		defer conn.Close()
 
@@ -167,7 +224,7 @@ func (f *FallbackImpl) ExecuteGRPC(
 			Payload: payload,
 		}
 
-		return client.CallGeneratedEndpoint(
+		response, err := client.CallGeneratedEndpoint(
 			ctx,
 			conn,
 			f.Config.FallbackService,
@@ -175,6 +232,20 @@ func (f *FallbackImpl) ExecuteGRPC(
 			request,
 			callOptions...,
 		)
+
+		if err != nil {
+			log.Printf(
+				"[FALLBACK GRPC] fallback request failed err=%v",
+				err,
+			)
+			return nil, err
+		}
+
+		log.Printf(
+			"[FALLBACK GRPC] fallback request succeeded",
+		)
+
+		return response, nil
 
 	default:
 

@@ -6,6 +6,7 @@ import (
 	"application-model/generated"
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -30,6 +31,11 @@ func (t *TimeoutImpl) Execute(cb RequestCallback) (any, error) {
 		t.Duration,
 	)
 
+	log.Printf(
+		"[TIMEOUT] starting request timeout=%v",
+		t.Duration,
+	)
+
 	defer cancel()
 
 	done := make(chan struct{})
@@ -46,8 +52,24 @@ func (t *TimeoutImpl) Execute(cb RequestCallback) (any, error) {
 
 	select {
 	case <-done:
+		if err != nil {
+			log.Printf(
+				"[TIMEOUT] request finished with error=%v",
+				err,
+			)
+		} else {
+			log.Printf(
+				"[TIMEOUT] request completed successfully",
+			)
+		}
 		return response, err
 	case <-ctx.Done():
+		log.Printf(
+			"[TIMEOUT] request timed out after=%v err=%v",
+			t.Duration,
+			ctx.Err(),
+		)
+
 		return nil, ctx.Err()
 	}
 }
