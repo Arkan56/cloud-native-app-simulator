@@ -63,25 +63,25 @@ func GRPC(service, endpoint string, port int, payload, sourceEndpoint string, cf
 
 	var fb *fallback.FallbackImpl
 
-	if circuitBreaker != nil {
-		response, err = circuitBreaker.ProxyGRPC(conn, service, endpoint, request, callOptions...)
+	if cfg != nil && cfg.Fallback != nil {
+		fb = fallback.NewFallback(*cfg.Fallback)
 	}
-	if cfg != nil {
-		if cfg.ExponentialBackoff != nil {
-			retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
-			response, err = retry.ProxyGRPC(conn, service, endpoint, request, callOptions...)
-		}
-		if cfg.Timeout != nil {
-			to := timeout.NewTimeout(*cfg.Timeout)
-			response, err = to.ProxyGRPC(conn, service, endpoint, request, callOptions...)
-		}
-		if cfg.Fallback != nil {
-			fb = fallback.NewFallback(*cfg.Fallback)
-		}
-	} else {
+
+	switch {
+	case cfg != nil && cfg.Timeout != nil:
+		to := timeout.NewTimeout(*cfg.Timeout)
+		response, err = to.ProxyGRPC(conn, service, endpoint, request, callOptions...)
+
+	case cfg != nil && cfg.ExponentialBackoff != nil:
+		retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
+		response, err = retry.ProxyGRPC(conn, service, endpoint, request, callOptions...)
+
+	case circuitBreaker != nil:
+		response, err = circuitBreaker.ProxyGRPC(conn, service, endpoint, request, callOptions...)
+
+	default:
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-
 		response, err = client.CallGeneratedEndpoint(ctx, conn, service, endpoint, request, callOptions...)
 	}
 

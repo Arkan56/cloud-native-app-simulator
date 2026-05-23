@@ -76,22 +76,23 @@ func POST(service, endpoint string, port int, payload string, headers http.Heade
 	var err error
 	var fb *fallback.FallbackImpl
 
-	if circuitBreaker != nil {
-		response, err = circuitBreaker.ProxyHTTP(request)
+	if cfg != nil && cfg.Fallback != nil {
+		fb = fallback.NewFallback(*cfg.Fallback)
 	}
-	if cfg != nil {
-		if cfg.ExponentialBackoff != nil {
-			retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
-			response, err = retry.ProxyHTTP(request)
-		}
-		if cfg.Timeout != nil {
-			to := timeout.NewTimeout(*cfg.Timeout)
-			response, err = to.ProxyHTTP(request)
-		}
-		if cfg.Fallback != nil {
-			fb = fallback.NewFallback(*cfg.Fallback)
-		}
-	} else {
+
+	switch {
+	case cfg != nil && cfg.Timeout != nil:
+		to := timeout.NewTimeout(*cfg.Timeout)
+		response, err = to.ProxyHTTP(request)
+
+	case cfg != nil && cfg.ExponentialBackoff != nil:
+		retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
+		response, err = retry.ProxyHTTP(request)
+
+	case circuitBreaker != nil:
+		response, err = circuitBreaker.ProxyHTTP(request)
+
+	default:
 		response, err = http.DefaultClient.Do(request)
 	}
 
