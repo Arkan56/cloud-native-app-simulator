@@ -19,6 +19,8 @@ package client
 import (
 	"application-emulator/src/resilience/circuit_breaker"
 	"application-emulator/src/resilience/exp_backoff"
+	"application-emulator/src/resilience/fallback"
+	"application-emulator/src/resilience/timeout"
 	model "application-model"
 	"application-model/generated"
 	"bytes"
@@ -72,21 +74,54 @@ func POST(service, endpoint string, port int, payload string, headers http.Heade
 
 	var response *http.Response
 	var err error
+	var fb *fallback.FallbackImpl
 
-	if circuitBreaker != nil {
-		response, err = circuitBreaker.ProxyHTTP(request)
+	if cfg != nil && cfg.Fallback != nil {
+		fb = fallback.NewFallback(*cfg.Fallback)
 	}
-	if cfg != nil {
-		if cfg.ExponentialBackoff != nil {
-			retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
-			response, err = retry.ProxyHTTP(request)
-		}
-	} else {
+
+	switch {
+	case cfg != nil && cfg.Timeout != nil:
+		to := timeout.NewTimeout(*cfg.Timeout)
+		response, err = to.ProxyHTTP(request)
+
+	case cfg != nil && cfg.ExponentialBackoff != nil:
+		retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
+		response, err = retry.ProxyHTTP(request)
+
+	case circuitBreaker != nil:
+		response, err = circuitBreaker.ProxyHTTP(request)
+
+	default:
 		response, err = http.DefaultClient.Do(request)
 	}
 
 	log.Printf("[CLIENT HTTP] Request returned from %s/%s", service, endpoint)
-	if err != nil {
+	if err != nil || (response != nil && response.StatusCode >= 500) {
+		if fb != nil {
+			resp, ferr := fb.ExecuteHTTP(postData, headers, endpoint)
+			if ferr == nil {
+				endpointResponse := &generated.Response{}
+				// Read all bytes
+				defer resp.Body.Close()
+				data, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return 0, nil, err
+				}
+				if useProtoJSON {
+					err = protojson.Unmarshal(data, endpointResponse)
+					if err != nil {
+						return 0, nil, err
+					}
+				} else {
+					err = json.Unmarshal(data, endpointResponse)
+					if err != nil {
+						return 0, nil, err
+					}
+				}
+				return resp.StatusCode, endpointResponse, nil
+			}
+		}
 		return 0, nil, err
 	}
 

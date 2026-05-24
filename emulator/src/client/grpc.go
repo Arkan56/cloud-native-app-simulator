@@ -20,6 +20,8 @@ import (
 	"application-emulator/src/generated/client"
 	"application-emulator/src/resilience/circuit_breaker"
 	"application-emulator/src/resilience/exp_backoff"
+	"application-emulator/src/resilience/fallback"
+	"application-emulator/src/resilience/timeout"
 	model "application-model"
 	"application-model/generated"
 	"context"
@@ -59,22 +61,37 @@ func GRPC(service, endpoint string, port int, payload, sourceEndpoint string, cf
 	}
 	callOptions := []grpc.CallOption{}
 
-	if circuitBreaker != nil {
-		response, err = circuitBreaker.ProxyGRPC(conn, service, endpoint, request, callOptions...)
+	var fb *fallback.FallbackImpl
+
+	if cfg != nil && cfg.Fallback != nil {
+		fb = fallback.NewFallback(*cfg.Fallback)
 	}
-	if cfg != nil {
-		if cfg.ExponentialBackoff != nil {
-			retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
-			response, err = retry.ProxyGRPC(conn, service, endpoint, request, callOptions...)
-		}
-	} else {
+
+	switch {
+	case cfg != nil && cfg.Timeout != nil:
+		to := timeout.NewTimeout(*cfg.Timeout)
+		response, err = to.ProxyGRPC(conn, service, endpoint, request, callOptions...)
+
+	case cfg != nil && cfg.ExponentialBackoff != nil:
+		retry := exp_backoff.NewExpBackoff(*cfg.ExponentialBackoff)
+		response, err = retry.ProxyGRPC(conn, service, endpoint, request, callOptions...)
+
+	case circuitBreaker != nil:
+		response, err = circuitBreaker.ProxyGRPC(conn, service, endpoint, request, callOptions...)
+
+	default:
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-
 		response, err = client.CallGeneratedEndpoint(ctx, conn, service, endpoint, request, callOptions...)
 	}
 
 	if err != nil {
+		if fb != nil {
+			fbResp, ferr := fb.ExecuteGRPC(payload, endpoint)
+			if ferr == nil {
+				return fbResp, nil
+			}
+		}
 		return nil, err
 	}
 
