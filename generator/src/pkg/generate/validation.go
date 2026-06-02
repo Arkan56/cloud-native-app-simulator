@@ -129,7 +129,6 @@ func ValidateProtocols(service *model.Service) error {
 	}
 
 	for _, endpoint := range service.Endpoints {
-
 		//Resilience patterns validations
 		if endpoint.ResiliencePatterns != nil {
 			if endpoint.NetworkComplexity == nil {
@@ -145,6 +144,8 @@ func ValidateProtocols(service *model.Service) error {
 
 		if endpoint.NetworkComplexity != nil {
 			for _, calledService := range endpoint.NetworkComplexity.CalledServices {
+				//Valedate the number of resilience patterns in input JSON
+				rpCount := 0
 				if !validProtocols[calledService.Protocol] {
 					return fmt.Errorf("call to endpoint '%s' from endpoint '%s' has invalid protocol '%s'",
 						calledService.Endpoint, endpoint.Name, calledService.Protocol)
@@ -169,6 +170,7 @@ func ValidateProtocols(service *model.Service) error {
 								"multiplier must be > 1",
 							)
 						}
+						rpCount++
 					}
 					//Timeout validations
 					to := calledService.ResiliencePatterns.Timeout
@@ -178,6 +180,7 @@ func ValidateProtocols(service *model.Service) error {
 								"timeout duration must be > 0",
 							)
 						}
+						rpCount++
 					}
 					//Fallback validations
 					fb := calledService.ResiliencePatterns.Fallback
@@ -216,6 +219,15 @@ func ValidateProtocols(service *model.Service) error {
 								)
 							}
 						}
+					}
+					if calledService.ActiveCircuitBreaker {
+						rpCount++
+					}
+
+					if rpCount > 1 {
+						return fmt.Errorf(
+							"a called service can use only one of: timeout, retry, or circuit breaker",
+						)
 					}
 				}
 			}
