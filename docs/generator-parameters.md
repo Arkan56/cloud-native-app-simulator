@@ -381,6 +381,7 @@ The CPU stressor will lock threads for exclusive access while it is executing. T
 * **port**: The port the server is responding to requests on. This is usually determined automatically.
 * **protocol**: Determines if the call will be made using HTTP or gRPC. This is usually determined automatically.
 * **active_circuit_breaker**: Determines if the endpoint circuit breaker will protect this service call.
+* **resilience_patterns**: An object containing resilience patterns applied only to a specific downstream dependency.
 
 #### Format
 
@@ -393,7 +394,10 @@ The CPU stressor will lock threads for exclusive access while it is executing. T
     "protocol": "<string:http|grpc>",
     "traffic_forward_ratio": <integer>,
     "request_payload_size": <integer:chars>,
-    "active_circuit_breaker": <boolean>
+    "active_circuit_breaker": <boolean>,
+    "resilience_patterns": {
+      ...
+    }
   }
 ]
 ```
