@@ -130,7 +130,7 @@ For each microservice, HydraGen supports a set of configuration parameters that 
 ]
 ```
 
-# Describing Resilience Patterns
+## Describing Resilience Patterns
 
 HydraGen supports the injection of resilience patterns into the generated client code. Resilience mechanisms can be configured at two different levels:
 
