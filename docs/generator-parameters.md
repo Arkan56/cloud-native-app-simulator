@@ -130,15 +130,33 @@ For each microservice, HydraGen supports a set of configuration parameters that 
 ]
 ```
 
-## Describing Resilience Patterns
+# Describing Resilience Patterns
 
-Hydragen supports the injection of resilience patterns into the client generated code. Initially, Circuit Breaker pattern is supported.
+HydraGen supports the injection of resilience patterns into the generated client code. Resilience mechanisms can be configured at two different levels:
+
+- **Endpoint level:** patterns that affect all outgoing calls performed by an endpoint.
+- **Called service level:** patterns applied only to a specific downstream dependency.
+
+Currently, HydraGen supports:
+
+- Circuit Breaker
+- Exponential Backoff
+- Timeout
+- Fallback
+
+> **Note:** Resilience patterns are mutually exclusive — only one pattern can be active per service call at a time. The only exception is Fallback, which can be combined with any of the other patterns.
+
+## Endpoint-Level Resilience
+
+Endpoint-level resilience patterns are configured under the endpoint definition.
 
 ### Circuit Breaker
 
-The circuit breaker implementation use a simple strategy to change the circuit breaker state (_CLOSED, OPEN and HALF OPEN_). If some request exceeds the timeout, the circuit breaker implementation will change the state to _OPEN_ (This meansthat the failed request threshold it's one request). After a configured timeout, the pattern will send a request to the destination service and check the response status.
+The circuit breaker implementation uses three states: _CLOSED_, _OPEN_, and _HALF_OPEN_.
 
-The circuit breaker is configured for the hole endpoint, but it must be enabled for each called service in Network stressor.
+If a request exceeds the configured timeout, the circuit transitions to the _OPEN_ state and subsequent requests are rejected. After the configured retry interval, the circuit enters the _HALF_OPEN_ state and allows a test request to determine whether communication with the downstream service can be restored.
+
+The circuit breaker is configured at endpoint level, but it must be explicitly enabled for each downstream service call using the `active_circuit_breaker` attribute.
 
 #### Required attributes
 
@@ -148,13 +166,163 @@ The circuit breaker is configured for the hole endpoint, but it must be enabled 
 #### Format
 
 ```json
-"resilience_patterns" : {
+"resilience_patterns": {
   "circuit_breaker": {
     "timeout": <integer>,
-    "retry_timer: <integer>
+    "retry_timer": <integer>
   }
 }
 ```
+
+#### Example
+
+```json
+"endpoints": [
+  {
+    "name": "api",
+    "resilience_patterns": {
+      "circuit_breaker": {
+        "timeout": 5,
+        "retry_timer": 10
+      }
+    }
+  }
+]
+```
+
+## Called Service Resilience
+
+HydraGen also supports resilience mechanisms that are configured independently for each downstream service call. These patterns are defined inside a `called_service` entry.
+
+#### Format
+
+```json
+"called_services": [
+  {
+    "service": "payment",
+    "endpoint": "charge",
+    "traffic_forward_ratio": 1,
+    "resilience_patterns": {
+      ...
+    }
+  }
+]
+```
+
+### Exponential Backoff
+
+The exponential backoff pattern automatically retries failed requests while increasing the waiting time between attempts. The delay is calculated using the configured multiplier until the maximum delay or maximum number of attempts is reached.
+
+#### Required attributes
+
+* **initial**: Determines the initial delay between retry attempts in seconds.
+* **max**: Determines the maximum delay allowed between retry attempts in seconds.
+* **multiplier**: Determines the factor used to increase the delay after each retry.
+* **max_attempts**: Determines the maximum number of retry attempts before giving up.
+
+#### Format
+
+```json
+"resilience_patterns": {
+  "exponential_backoff": {
+    "initial": <float>,
+    "max": <float>,
+    "multiplier": <float>,
+    "max_attempts": <integer>
+  }
+}
+```
+
+#### Example
+
+```json
+"resilience_patterns": {
+  "exponential_backoff": {
+    "initial": 0.5,
+    "max": 10,
+    "multiplier": 2,
+    "max_attempts": 5
+  }
+}
+```
+
+### Timeout
+
+The timeout pattern limits the maximum amount of time that a downstream request is allowed to execute. If the configured duration is exceeded, the request is aborted and considered failed.
+
+#### Required attributes
+
+* **duration**: Determines the maximum request duration in seconds.
+
+#### Format
+
+```json
+"resilience_patterns": {
+  "timeout": {
+    "duration": <float>
+  }
+}
+```
+
+#### Example
+
+```json
+"resilience_patterns": {
+  "timeout": {
+    "duration": 2.5
+  }
+}
+```
+
+### Fallback
+
+The fallback pattern defines an alternative action when a downstream request cannot be completed successfully.
+
+Two fallback modes are currently supported:
+
+- `static`: Returns a predefined response.
+- `service`: Redirects the request to an alternative service endpoint.
+
+#### Required attributes
+
+* **type**: Determines the fallback strategy (`static` or `service`).
+
+#### Static fallback attributes
+
+* **response_code**: The HTTP status code to return.
+* **response_payload**: The response payload returned to the caller.
+
+#### Service fallback attributes
+
+* **service**: The name of the fallback service.
+* **endpoint**: The endpoint exposed by the fallback service.
+* **port**: The port used by the fallback service.
+
+#### Static Fallback Example
+
+```json
+"resilience_patterns": {
+  "fallback": {
+    "type": "static",
+    "response_code": 200,
+    "response_payload": "{\"status\":\"fallback\"}"
+  }
+}
+```
+
+#### Service Fallback Example
+
+```json
+"resilience_patterns": {
+  "fallback": {
+    "type": "service",
+    "service": "backup-payment",
+    "endpoint": "charge",
+    "port": 8080
+  }
+}
+```
+
 
 ## Describing Resource Stressors
 
